@@ -474,6 +474,97 @@ describe("A frac parser", function() {
     });
 });
 
+describe("An over parser", function() {
+    var simpleOver = "1 \\over x";
+    var complexOver = "1+2i \\over 3+4i";
+
+    it("should not fail", function () {
+        expect(simpleOver).toParse();
+        expect(complexOver).toParse();
+    });
+
+    it("should produce a frac", function() {
+        var parse;
+
+        parse = parseTree(simpleOver)[0];
+
+        expect(parse.type).toMatch("frac");
+        expect(parse.value.numer).toBeDefined();
+        expect(parse.value.denom).toBeDefined();
+
+        parse = parseTree(complexOver)[0];
+
+        expect(parse.type).toMatch("frac");
+        expect(parse.value.numer).toBeDefined();
+        expect(parse.value.denom).toBeDefined();
+    });
+
+    it("should create a numerator from the atoms before \\over", function () {
+        var parse = parseTree(complexOver)[0];
+
+        var numer = parse.value.numer;
+        expect(numer.value.length).toEqual(4);
+    });
+
+    it("should create a demonimator from the atoms after \\over", function () {
+        var parse = parseTree(complexOver)[0];
+
+        var denom = parse.value.numer;
+        expect(denom.value.length).toEqual(4);
+    });
+
+    it("should handle empty numerators", function () {
+        var emptyNumerator = "\\over x";
+        expect(emptyNumerator).toParse();
+
+        var parse = parseTree(emptyNumerator)[0];
+        expect(parse.type).toMatch("frac");
+        expect(parse.value.numer).toBeDefined();
+        expect(parse.value.denom).toBeDefined();
+    });
+
+    it("should handle empty denominators", function () {
+        var emptyDenominator = "1 \\over";
+        expect(emptyDenominator).toParse();
+
+        var parse = parseTree(emptyDenominator)[0];
+        expect(parse.type).toMatch("frac");
+        expect(parse.value.numer).toBeDefined();
+        expect(parse.value.denom).toBeDefined();
+    });
+
+    it("should handle \\displaystyle correctly", function () {
+        var displaystyleExpression = "\\displaystyle 1 \\over 2";
+        expect(displaystyleExpression).toParse();
+
+        var parse = parseTree(displaystyleExpression)[0];
+        expect(parse.type).toMatch("frac");
+        expect(parse.value.numer.value[0].type).toMatch("styling");
+        expect(parse.value.denom).toBeDefined();
+    });
+
+    it("should handle nested factions", function () {
+        var nestedOverExpression = "{1 \\over 2} \\over 3";
+        expect(nestedOverExpression).toParse();
+
+        var parse = parseTree(nestedOverExpression)[0];
+        expect(parse.type).toMatch("frac");
+        expect(parse.value.numer.value[0].type).toMatch("frac");
+        expect(parse.value.numer.value[0].value.numer.value[0].value).toMatch(1);
+        expect(parse.value.numer.value[0].value.denom.value[0].value).toMatch(2);
+        expect(parse.value.denom).toBeDefined();
+        expect(parse.value.denom.value[0].value).toMatch(3);
+    });
+
+    it("should fail with multiple overs in the same group", function () {
+        var badMultipleOvers = "1 \\over 2 + 3 \\over 4";
+        expect(badMultipleOvers).toNotParse();
+
+        var badOverChoose = "1 \\over 2 \\choose 3";
+        expect(badOverChoose).toNotParse();
+    });
+});
+
 describe("A sizing parser", function() {
     var sizeExpression = "\\Huge{x}\\small{x}";
     var nestedSizeExpression = "\\Huge{\\small{x}}";
@@ -715,6 +806,15 @@ describe("A rule parser", function() {
 
         expect(hardNumberParse.value.width.number).toBeCloseTo(1.24);
         expect(hardNumberParse.value.height.number).toBeCloseTo(2.45);
+    });
+
+    it("should parse negative sizes", function() {
+        expect("\\rule{-1em}{- 0.2em}").toParse();
+
+        var parse = parseTree("\\rule{-1em}{- 0.2em}")[0];
+
+        expect(parse.value.width.number).toBeCloseTo(-1);
+        expect(parse.value.height.number).toBeCloseTo(-0.2);
     });
 });
 
@@ -1038,5 +1138,42 @@ describe("An accent builder", function() {
         expect(getBuilt("\\vec +")[0].classes).not.toContain("mbin");
         expect(getBuilt("\\vec )^2")[0].classes).toContain("mord");
         expect(getBuilt("\\vec )^2")[0].classes).not.toContain("mclose");
+    });
+});
+
+describe("A parser error", function () {
+    it("should report the position of an error", function () {
+        try {
+            parseTree("\\sqrt}");
+        } catch (e) {
+            expect(e.position).toEqual(5);
+        }
+    });
+});
+
+describe("An optional argument parser", function() {
+    it("should not fail", function() {
+        // Note this doesn't actually make an optional argument, but still
+        // should work
+        expect("\\frac[1]{2}{3}").toParse();
+
+        expect("\\rule[0.2em]{1em}{1em}").toParse();
+    });
+
+    it("should fail on sqrts for now", function() {
+        expect("\\sqrt[3]{2}").toNotParse();
+    });
+
+    it("should work when the optional argument is missing", function() {
+        expect("\\sqrt{2}").toParse();
+        expect("\\rule{1em}{2em}").toParse();
+    });
+
+    it("should fail when the optional argument is malformed", function() {
+        expect("\\rule[1]{2em}{3em}").toNotParse();
+    });
+
+    it("should not work if the optional argument isn't closed", function() {
+        expect("\\sqrt[").toNotParse();
     });
 });

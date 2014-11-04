@@ -49,7 +49,7 @@ line to `functions.js` as well as adding an output function in
 ## Testing
 
 Local testing can be done by running the node server in `server.js`. Run `make
-setup` to insteall dependencies, and then `make serve` to start the server.
+setup` to install dependencies, and then `make serve` to start the server.
 
 This will host an interactive editor at
 [http://localhost:7936/](http://localhost:7936/) to play around with and test
@@ -66,7 +66,7 @@ The Jasmine tests should be run after every change, even the addition of small
 symbols. However, [Travis](https://travis-ci.org/Khan/KaTeX/) will run these
 tests when you submit a pull request, in case you forget.
 
-If you make any changes to Parser.js, add jasmine tests to ensure they work.
+If you make any changes to Parser.js, add Jasmine tests to ensure they work.
 
 #### Huxley tests
 
@@ -102,6 +102,10 @@ Code
  - commas last
 
 In general, try to make your code blend in with the surrounding code.
+
+## CLA
+
+In order to contribute to KaTeX, you must first sign the CLA, found at www.khanacademy.org/r/cla
 
 ## License
 

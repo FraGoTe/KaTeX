@@ -112,6 +112,36 @@ var symbols = {
             group: "textord",
             replace: "\u03a9"
         },
+        "\\neg": {
+            font: "main",
+            group: "textord",
+            replace: "\u00ac"
+        },
+        "\\lnot": {
+            font: "main",
+            group: "textord",
+            replace: "\u00ac"
+        },
+        "\\top": {
+            font: "main",
+            group: "textord",
+            replace: "\u22a4"
+        },
+        "\\bot": {
+            font: "main",
+            group: "textord",
+            replace: "\u22a5"
+        },
+        "\\emptyset": {
+            font: "main",
+            group: "textord",
+            replace: "\u2205"
+        },
+        "\\varnothing": {
+            font: "ams",
+            group: "textord",
+            replace: "\u2205"
+        },
         "\\alpha": {
             font: "main",
             group: "mathord",
@@ -301,6 +331,41 @@ var symbols = {
             group: "bin",
             replace: "\u00d7"
         },
+        "\\cap": {
+            font: "main",
+            group: "bin",
+            replace: "\u2229"
+        },
+        "\\cup": {
+            font: "main",
+            group: "bin",
+            replace: "\u222a"
+        },
+        "\\setminus": {
+            font: "main",
+            group: "bin",
+            replace: "\u2216"
+        },
+        "\\land": {
+            font: "main",
+            group: "bin",
+            replace: "\u2227"
+        },
+        "\\lor": {
+            font: "main",
+            group: "bin",
+            replace: "\u2228"
+        },
+        "\\wedge": {
+            font: "main",
+            group: "bin",
+            replace: "\u2227"
+        },
+        "\\vee": {
+            font: "main",
+            group: "bin",
+            replace: "\u2228"
+        },
         "\\surd": {
             font: "main",
             group: "textord",
@@ -395,6 +460,46 @@ var symbols = {
             font: "main",
             group: "rel",
             replace: "\u2208"
+        },
+        "\\notin": {
+            font: "main",
+            group: "rel",
+            replace: "\u2209"
+        },
+        "\\subset": {
+            font: "main",
+            group: "rel",
+            replace: "\u2282"
+        },
+        "\\supset": {
+            font: "main",
+            group: "rel",
+            replace: "\u2283"
+        },
+        "\\subseteq": {
+            font: "main",
+            group: "rel",
+            replace: "\u2286"
+        },
+        "\\supseteq": {
+            font: "main",
+            group: "rel",
+            replace: "\u2287"
+        },
+        "\\nsubseteq": {
+            font: "ams",
+            group: "rel",
+            replace: "\u2288"
+        },
+        "\\nsupseteq": {
+            font: "ams",
+            group: "rel",
+            replace: "\u2289"
+        },
+        "\\models": {
+            font: "main",
+            group: "rel",
+            replace: "\u22a8"
         },
         "\\leftarrow": {
             font: "main",
@@ -521,6 +626,11 @@ var symbols = {
             font: "main",
             group: "textord",
             replace: "\u2297"
+        },
+        "\\partial":{
+            font: "main",
+            group: "textord",
+            replace: "\u2202"
         },
         "\\oslash": {
             font: "main",
@@ -863,7 +973,7 @@ var symbols = {
 var mathTextSymbols = "0123456789/@.\"";
 for (var i = 0; i < mathTextSymbols.length; i++) {
     var ch = mathTextSymbols.charAt(i);
-    symbols["math"][ch] = {
+    symbols.math[ch] = {
         font: "main",
         group: "textord"
     };
@@ -873,7 +983,7 @@ for (var i = 0; i < mathTextSymbols.length; i++) {
 var textSymbols = "0123456789`!@*()-=+[]'\";:?/.,";
 for (var i = 0; i < textSymbols.length; i++) {
     var ch = textSymbols.charAt(i);
-    symbols["text"][ch] = {
+    symbols.text[ch] = {
         font: "main",
         group: "textord"
     };
@@ -883,11 +993,11 @@ for (var i = 0; i < textSymbols.length; i++) {
 var letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 for (var i = 0; i < letters.length; i++) {
     var ch = letters.charAt(i);
-    symbols["math"][ch] = {
+    symbols.math[ch] = {
         font: "main",
         group: "mathord"
     };
-    symbols["text"][ch] = {
+    symbols.text[ch] = {
         font: "main",
         group: "textord"
     };

@@ -9,8 +9,9 @@ var ParseError = require("./ParseError");
  * The data contains the following keys:
  *  - numArgs: The number of arguments the function takes.
  *  - argTypes: (optional) An array corresponding to each argument of the
- *              function, giving the type of argument that should be parsed.
- *              Valid types:
+ *              function, giving the type of argument that should be parsed. Its
+ *              length should be equal to `numArgs + numOptionalArgs`. Valid
+ *              types:
  *               - "size": A size-like thing, such as "1em" or "5ex"
  *               - "color": An html color, like "#abc" or "blue"
  *               - "original": The same type as the environment that the
@@ -45,6 +46,10 @@ var ParseError = require("./ParseError");
  *                The default value is `1`
  *  - allowedInText: (optional) Whether or not the function is allowed inside
  *                   text mode (default false)
+ *  - numOptionalArgs: (optional) The number of optional arguments the function
+ *                     should parse. If the optional arguments aren't found,
+ *                     `null` will be passed to the handler in their place.
+ *                     (default 0)
  *  - handler: The function that is called to handle this function and its
  *             arguments. The arguments are:
  *              - func: the text of the function
@@ -65,7 +70,14 @@ var functions = {
     // A normal square root
     "\\sqrt": {
         numArgs: 1,
-        handler: function(func, body) {
+        numOptionalArgs: 1,
+        handler: function(func, optional, body, positions) {
+            if (optional != null) {
+                throw new ParseError(
+                    "Optional arguments to \\sqrt aren't supported yet",
+                    this.lexer, positions[1] - 1);
+            }
+
             return {
                 type: "sqrt",
                 body: body
@@ -132,10 +144,12 @@ var functions = {
     // A box of the width and height
     "\\rule": {
         numArgs: 2,
-        argTypes: ["size", "size"],
-        handler: function(func, width, height) {
+        numOptionalArgs: 1,
+        argTypes: ["size", "size", "size"],
+        handler: function(func, shift, width, height) {
             return {
                 type: "rule",
+                shift: shift && shift.value,
                 width: width.value,
                 height: height.value
             };
@@ -305,16 +319,55 @@ var duplicatedFunctions = [
 
     // Fractions
     {
-        funcs: ["\\dfrac", "\\frac", "\\tfrac"],
+        funcs: [
+            "\\dfrac", "\\frac", "\\tfrac",
+            "\\dbinom", "\\binom", "\\tbinom"
+        ],
         data: {
             numArgs: 2,
             greediness: 2,
             handler: function(func, numer, denom) {
+                var hasBarLine;
+                var leftDelim = null;
+                var rightDelim = null;
+                var size = "auto";
+
+                switch (func) {
+                    case "\\dfrac":
+                    case "\\frac":
+                    case "\\tfrac":
+                        hasBarLine = true;
+                        break;
+                    case "\\dbinom":
+                    case "\\binom":
+                    case "\\tbinom":
+                        hasBarLine = false;
+                        leftDelim = "(";
+                        rightDelim = ")";
+                        break;
+                    default:
+                        throw new Error("Unrecognized genfrac command");
+                }
+
+                switch (func) {
+                    case "\\dfrac":
+                    case "\\dbinom":
+                        size = "display";
+                        break;
+                    case "\\tfrac":
+                    case "\\tbinom":
+                        size = "text";
+                        break;
+                }
+
                 return {
-                    type: "frac",
+                    type: "genfrac",
                     numer: numer,
                     denom: denom,
-                    size: func.slice(1)
+                    hasBarLine: hasBarLine,
+                    leftDelim: leftDelim,
+                    rightDelim: rightDelim,
+                    size: size
                 };
             }
         }
@@ -414,6 +467,31 @@ var duplicatedFunctions = [
                 };
             }
         }
+    },
+
+    // Infix generalized fractions
+    {
+        funcs: ["\\over", "\\choose"],
+        data: {
+            numArgs: 0,
+            handler: function (func) {
+                var replaceWith;
+                switch (func) {
+                    case "\\over":
+                        replaceWith = "\\frac";
+                        break;
+                    case "\\choose":
+                        replaceWith = "\\binom";
+                        break;
+                    default:
+                        throw new Error("Unrecognized infix genfrac command");
+                }
+                return {
+                    type: "infix",
+                    replaceWith: replaceWith
+                };
+            }
+        }
     }
 ];
 
@@ -437,6 +515,23 @@ var getGreediness = function(func) {
         return functions[func].greediness;
     }
 };
+
+// Set default values of functions
+for (var f in functions) {
+    if (functions.hasOwnProperty(f)) {
+        var func = functions[f];
+
+        functions[f] = {
+            numArgs: func.numArgs,
+            argTypes: func.argTypes,
+            greediness: (func.greediness === undefined) ? 1 : func.greediness,
+            allowedInText: func.allowedInText ? func.allowedInText : false,
+            numOptionalArgs: (func.numOptionalArgs === undefined) ? 0 :
+                func.numOptionalArgs,
+            handler: func.handler
+        };
+    }
+}
 
 module.exports = {
     funcs: functions,

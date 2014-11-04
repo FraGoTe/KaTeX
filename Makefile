@@ -1,22 +1,22 @@
-.PHONY: build setup copy serve clean metrics test zip
-build: setup build/katex.min.js build/katex.min.css zip compress
+.PHONY: build lint setup copy serve clean metrics test zip
+build: setup lint build/katex.min.js build/katex.min.css zip compress
 
 setup:
 	npm install
+
+lint: katex.js $(wildcard src/*.js)
+	./node_modules/.bin/jshint $^
 
 build/katex.js: katex.js $(wildcard src/*.js)
 	./node_modules/.bin/browserify $< --standalone katex > $@
 
 build/katex.min.js: build/katex.js
-	./node_modules/.bin/uglifyjs --mangle < $< > $@
+	./node_modules/.bin/uglifyjs --mangle --beautify ascii_only=true,beautify=false < $< > $@
 
-build/katex.less.css: static/katex.less
-	./node_modules/.bin/lessc $< > $@
+build/katex.less.css: static/katex.less $(wildcard static/*.less)
+	./node_modules/.bin/lessc $< $@
 
-build/katex.css: build/katex.less.css static/fonts.css
-	cat $^ > $@
-
-build/katex.min.css: build/katex.css
+build/katex.min.css: build/katex.less.css
 	./node_modules/.bin/cleancss -o $@ $<
 
 .PHONY: build/fonts

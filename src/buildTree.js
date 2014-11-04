@@ -1,5 +1,5 @@
 /**
- * This file does the main work of building a domTree sturcture from a parse
+ * This file does the main work of building a domTree structure from a parse
  * tree. The entry point is the `buildTree` function, which takes a parse tree.
  * Then, the buildExpression, buildGroup, and various groupTypes functions are
  * called, to produce a final tree.
@@ -13,8 +13,6 @@ var buildCommon = require("./buildCommon");
 var delimiter = require("./delimiter");
 var domTree = require("./domTree");
 var fontMetrics = require("./fontMetrics");
-var parseTree = require("./parseTree");
-var symbols = require("./symbols");
 var utils = require("./utils");
 
 var makeSpan = buildCommon.makeSpan;
@@ -99,7 +97,7 @@ var getTypeOfGroup = function(group) {
  * handling them itself.
  */
 var shouldHandleSupSub = function(group, options) {
-    if (group == null) {
+    if (!group) {
         return false;
     } else if (group.type === "op") {
         // Operators handle supsubs differently when they have limits
@@ -118,7 +116,7 @@ var shouldHandleSupSub = function(group, options) {
  * a single element, we want to pull that out.
  */
 var getBaseElem = function(group) {
-    if (group == null) {
+    if (!group) {
         return false;
     } else if (group.type === "ordgroup") {
         if (group.value.length === 1) {
@@ -248,7 +246,6 @@ var groupTypes = {
     supsub: function(group, options, prev) {
         // Superscript and subscripts are handled in the TeXbook on page
         // 445-446, rules 18(a-f).
-        var baseGroup = group.value.base;
 
         // Here is where we defer to the inner group if it should handle
         // superscripts and subscripts itself.
@@ -257,18 +254,19 @@ var groupTypes = {
         }
 
         var base = buildGroup(group.value.base, options.reset());
+        var supmid, submid, sup, sub;
 
         if (group.value.sup) {
-            var sup = buildGroup(group.value.sup,
+            sup = buildGroup(group.value.sup,
                     options.withStyle(options.style.sup()));
-            var supmid = makeSpan(
+            supmid = makeSpan(
                     [options.style.reset(), options.style.sup().cls()], [sup]);
         }
 
         if (group.value.sub) {
-            var sub = buildGroup(group.value.sub,
+            sub = buildGroup(group.value.sub,
                     options.withStyle(options.style.sub()));
-            var submid = makeSpan(
+            submid = makeSpan(
                     [options.style.reset(), options.style.sub().cls()], [sub]);
         }
 
@@ -366,14 +364,14 @@ var groupTypes = {
             [base, supsub]);
     },
 
-    frac: function(group, options, prev) {
+    genfrac: function(group, options, prev) {
         // Fractions are handled in the TeXbook on pages 444-445, rules 15(a-e).
         // Figure out what style this fraction should be in based on the
         // function used
         var fstyle = options.style;
-        if (group.value.size === "dfrac") {
+        if (group.value.size === "display") {
             fstyle = Style.DISPLAY;
-        } else if (group.value.size === "tfrac") {
+        } else if (group.value.size === "text") {
             fstyle = Style.TEXT;
         }
 
@@ -384,62 +382,120 @@ var groupTypes = {
         var numerreset = makeSpan([fstyle.reset(), nstyle.cls()], [numer]);
 
         var denom = buildGroup(group.value.denom, options.withStyle(dstyle));
-        var denomreset = makeSpan([fstyle.reset(), dstyle.cls()], [denom])
+        var denomreset = makeSpan([fstyle.reset(), dstyle.cls()], [denom]);
 
-        var ruleWidth = fontMetrics.metrics.defaultRuleThickness /
-            options.style.sizeMultiplier;
+        var ruleWidth;
+        if (group.value.hasBarLine) {
+            ruleWidth = fontMetrics.metrics.defaultRuleThickness /
+                options.style.sizeMultiplier;
+        } else {
+            ruleWidth = 0;
+        }
 
-        var mid = makeSpan(
-            [options.style.reset(), Style.TEXT.cls(), "frac-line"]);
-        // Manually set the height of the line because its height is created in
-        // CSS
-        mid.height = ruleWidth;
-
-        // Rule 15b, 15d
-        var numShift, denomShift, clearance;
+        // Rule 15b
+        var numShift;
+        var clearance;
+        var denomShift;
         if (fstyle.size === Style.DISPLAY.size) {
             numShift = fontMetrics.metrics.num1;
+            if (ruleWidth > 0) {
+                clearance = 3 * ruleWidth;
+            } else {
+                clearance = 7 * fontMetrics.metrics.defaultRuleThickness;
+            }
             denomShift = fontMetrics.metrics.denom1;
-            clearance = 3 * ruleWidth;
         } else {
-            numShift = fontMetrics.metrics.num2;
+            if (ruleWidth > 0) {
+                numShift = fontMetrics.metrics.num2;
+                clearance = ruleWidth;
+            } else {
+                numShift = fontMetrics.metrics.num3;
+                clearance = 3 * fontMetrics.metrics.defaultRuleThickness;
+            }
             denomShift = fontMetrics.metrics.denom2;
-            clearance = ruleWidth;
         }
 
-        var axisHeight = fontMetrics.metrics.axisHeight;
+        var frac;
+        if (ruleWidth === 0) {
+            // Rule 15c
+            var candiateClearance =
+                (numShift - numer.depth) - (denom.height - denomShift);
+            if (candiateClearance < clearance) {
+                numShift += 0.5 * (clearance - candiateClearance);
+                denomShift += 0.5 * (clearance - candiateClearance);
+            }
 
-        // Rule 15d
-        if ((numShift - numer.depth) - (axisHeight + 0.5 * ruleWidth)
-                < clearance) {
-            numShift +=
-                clearance - ((numShift - numer.depth) -
-                             (axisHeight + 0.5 * ruleWidth));
+            frac = buildCommon.makeVList([
+                {type: "elem", elem: denomreset, shift: denomShift},
+                {type: "elem", elem: numerreset, shift: -numShift}
+            ], "individualShift", null, options);
+        } else {
+            // Rule 15d
+            var axisHeight = fontMetrics.metrics.axisHeight;
+
+            if ((numShift - numer.depth) - (axisHeight + 0.5 * ruleWidth)
+                    < clearance) {
+                numShift +=
+                    clearance - ((numShift - numer.depth) -
+                                 (axisHeight + 0.5 * ruleWidth));
+            }
+
+            if ((axisHeight - 0.5 * ruleWidth) - (denom.height - denomShift)
+                    < clearance) {
+                denomShift +=
+                    clearance - ((axisHeight - 0.5 * ruleWidth) -
+                                 (denom.height - denomShift));
+            }
+
+            var mid = makeSpan(
+                [options.style.reset(), Style.TEXT.cls(), "frac-line"]);
+            // Manually set the height of the line because its height is
+            // created in CSS
+            mid.height = ruleWidth;
+
+            var midShift = -(axisHeight - 0.5 * ruleWidth);
+
+            frac = buildCommon.makeVList([
+                {type: "elem", elem: denomreset, shift: denomShift},
+                {type: "elem", elem: mid,        shift: midShift},
+                {type: "elem", elem: numerreset, shift: -numShift}
+            ], "individualShift", null, options);
         }
-
-        if ((axisHeight - 0.5 * ruleWidth) - (denom.height - denomShift)
-                < clearance) {
-            denomShift +=
-                clearance - ((axisHeight - 0.5 * ruleWidth) -
-                             (denom.height - denomShift));
-        }
-
-        var midShift = -(axisHeight - 0.5 * ruleWidth);
-
-        var frac = buildCommon.makeVList([
-            {type: "elem", elem: denomreset, shift: denomShift},
-            {type: "elem", elem: mid,        shift: midShift},
-            {type: "elem", elem: numerreset, shift: -numShift}
-        ], "individualShift", null, options);
 
         // Since we manually change the style sometimes (with \dfrac or \tfrac),
         // account for the possible size change here.
         frac.height *= fstyle.sizeMultiplier / options.style.sizeMultiplier;
         frac.depth *= fstyle.sizeMultiplier / options.style.sizeMultiplier;
 
+        // Rule 15e
+        var innerChildren = [makeSpan(["mfrac"], [frac])];
+
+        var delimSize;
+        if (fstyle.size === Style.DISPLAY.size) {
+            delimSize = fontMetrics.metrics.delim1;
+        } else {
+            delimSize = fontMetrics.metrics.getDelim2(fstyle);
+        }
+
+        if (group.value.leftDelim != null) {
+            innerChildren.unshift(
+                delimiter.customSizedDelim(
+                    group.value.leftDelim, delimSize, true,
+                    options.withStyle(fstyle), group.mode)
+            );
+        }
+        if (group.value.rightDelim != null) {
+            innerChildren.push(
+                delimiter.customSizedDelim(
+                    group.value.rightDelim, delimSize, true,
+                    options.withStyle(fstyle), group.mode)
+            );
+        }
+
         return makeSpan(
-            ["minner", "mfrac", options.style.reset(), fstyle.cls()],
-            [frac], options.getColor());
+            ["minner", options.style.reset(), fstyle.cls()],
+            innerChildren,
+            options.getColor());
     },
 
     spacing: function(group, options, prev) {
@@ -551,7 +607,7 @@ var groupTypes = {
         if (hasLimits) {
             // IE 8 clips \int if it is in a display: inline-block. We wrap it
             // in a new span so it is an inline, and works.
-            var base = makeSpan([], [base]);
+            base = makeSpan([], [base]);
 
             var supmid, supKern, submid, subKern;
             // We manually have to handle the superscripts and subscripts. This,
@@ -581,9 +637,9 @@ var groupTypes = {
 
             // Build the final group as a vlist of the possible subscript, base,
             // and possible superscript.
-            var finalGroup;
+            var finalGroup, top, bottom;
             if (!supGroup) {
-                var top = base.height - baseShift;
+                top = base.height - baseShift;
 
                 finalGroup = buildCommon.makeVList([
                     {type: "kern", size: fontMetrics.metrics.bigOpSpacing5},
@@ -598,7 +654,7 @@ var groupTypes = {
                 // margin will shift by 1/2 that.
                 finalGroup.children[0].style.marginLeft = -slant + "em";
             } else if (!subGroup) {
-                var bottom = base.depth + baseShift;
+                bottom = base.depth + baseShift;
 
                 finalGroup = buildCommon.makeVList([
                     {type: "elem", elem: base},
@@ -615,7 +671,7 @@ var groupTypes = {
                 // subscript) but be safe.
                 return base;
             } else {
-                var bottom = fontMetrics.metrics.bigOpSpacing5 +
+                bottom = fontMetrics.metrics.bigOpSpacing5 +
                     submid.height + submid.depth +
                     subKern +
                     base.depth + baseShift;
@@ -743,7 +799,7 @@ var groupTypes = {
         }
 
         // Shift the delimiter so that its top lines up with the top of the line
-        delimShift = -(inner.height + lineClearance + ruleWidth) + delim.height;
+        var delimShift = -(inner.height + lineClearance + ruleWidth) + delim.height;
         delim.style.top = delimShift + "em";
         delim.height -= delimShift;
         delim.depth += delimShift;
@@ -876,7 +932,15 @@ var groupTypes = {
         // Make an empty span for the rule
         var rule = makeSpan(["mord", "rule"], [], options.getColor());
 
-        // Calculate the width and height of the rule, and account for units
+        // Calculate the shift, width, and height of the rule, and account for units
+        var shift = 0;
+        if (group.value.shift) {
+            shift = group.value.shift.number;
+            if (group.value.shift.unit === "ex") {
+                shift *= fontMetrics.metrics.xHeight;
+            }
+        }
+
         var width = group.value.width.number;
         if (group.value.width.unit === "ex") {
             width *= fontMetrics.metrics.xHeight;
@@ -889,16 +953,19 @@ var groupTypes = {
 
         // The sizes of rules are absolute, so make it larger if we are in a
         // smaller style.
+        shift /= options.style.sizeMultiplier;
         width /= options.style.sizeMultiplier;
         height /= options.style.sizeMultiplier;
 
         // Style the rule to the right size
         rule.style.borderRightWidth = width + "em";
         rule.style.borderTopWidth = height + "em";
+        rule.style.bottom = shift + "em";
 
         // Record the height and width
         rule.width = width;
-        rule.height = height;
+        rule.height = height + shift;
+        rule.depth = -shift;
 
         return rule;
     },
@@ -978,7 +1045,7 @@ var groupTypes = {
         var accentBody = makeSpan(["accent-body", vecClass], [
             makeSpan([], [accent])]);
 
-        var accentBody = buildCommon.makeVList([
+        accentBody = buildCommon.makeVList([
             {type: "elem", elem: body},
             {type: "kern", size: -clearance},
             {type: "elem", elem: accentBody}
@@ -1036,11 +1103,12 @@ var buildGroup = function(group, options, prev) {
     if (groupTypes[group.type]) {
         // Call the groupTypes function
         var groupNode = groupTypes[group.type](group, options, prev);
+        var multiplier;
 
         // If the style changed between the parent and the current group,
         // account for the size difference
         if (options.style !== options.parentStyle) {
-            var multiplier = options.style.sizeMultiplier /
+            multiplier = options.style.sizeMultiplier /
                     options.parentStyle.sizeMultiplier;
 
             groupNode.height *= multiplier;
@@ -1050,7 +1118,7 @@ var buildGroup = function(group, options, prev) {
         // If the size changed between the parent and the current group, account
         // for that size difference.
         if (options.size !== options.parentSize) {
-            var multiplier = sizingMultiplier[options.size] /
+            multiplier = sizingMultiplier[options.size] /
                     sizingMultiplier[options.parentSize];
 
             groupNode.height *= multiplier;
